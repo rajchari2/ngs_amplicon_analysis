@@ -147,6 +147,8 @@ def calculate_base_editing_rate (pileup_file,modality,illumina_scoring_file,refe
 	# go through the pileup file
 	base_change_list = defaultdict(dict)
 	avgDepth = defaultdict(list)
+	# initialize for the gene
+	avgDepth[gene] = []
 
 	for line in pileup_file:
 		line = line.rstrip('\r\n')
@@ -247,18 +249,24 @@ def calculate_rate(pileup_file,control,illumina_scoring_file,reference_file,targ
 	# store reference sequence
 	refDB = defaultdict(str)
 	targetDB = defaultdict(str)
+	gene = ''
 	for record in SeqIO.parse(reference_file,'fasta'):
 		refDB[str(record.id)] = str(record.seq)
 		targetDB[str(record.id)] = target_site
+		gene = str(record.id)
 	
 	# write headers to the output file
 	output_file.write('File\tGene\tMutatedCount\tTotalCount\tMutation_Percentage\n')
 
 	# structure to hold the mutated reads -> gene -> sample -> read# -> [alterationList]
-	mutationCount = defaultdict(int)
 	avgDepth = defaultdict(list)
 	mutatedReads = defaultdict(dict)
 	controlReads = defaultdict(list)
+
+	# initialize for the gene
+	avgDepth[gene] = []
+	mutatedReads[gene] = defaultdict(list)
+	controlReads[gene] = []
 
 	control_file = 'processed/' + control + '_mpileup.tab'
 	control_file_handle = open(control_file,'r')
@@ -374,7 +382,7 @@ def calculate_rate(pileup_file,control,illumina_scoring_file,reference_file,targ
 		for readID in mutatedReads[gene]:
 			if len(mutatedReads[gene][readID]) > 0:
 				mutatedCount += 1
-		if max(avgDepth[gene]) > 0:
+		if max(avgDepth[gene]) >= 100:
 			rate = (mutatedCount / max(avgDepth[gene])) * 100
 		else:
 			rate = 'N/A'
