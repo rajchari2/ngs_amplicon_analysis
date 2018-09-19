@@ -238,7 +238,14 @@ def calculate_base_editing_rate (pileup_file,modality,illumina_scoring_file,refe
 						value = 0
 					line_to_write = line_to_write + '\t' + str(value)
 					current_pos -= 1
-		output_file.write(line_to_write + '\n')
+		# make sure there's enough data
+
+		# see if no data was added
+		if len(avgDepth[gene])==0:
+			avgDepth[gene].append(0)
+
+		if max(avgDepth[gene]) >= 100:
+			output_file.write(line_to_write + '\n')
 	output_file.close()
 
 
