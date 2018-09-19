@@ -155,3 +155,19 @@ rule make_all:
 		index_file = rules.build_indexes.output.index_file_created,
 		control_file = rules.build_controls.output.controls_created,
 		report_file = rules.graph_output.output.output_file
+
+rule clean_run:
+	params:
+		index_file_created = 'db/' + project_name + '_' + ngs_run + '_Indexes_Created.tab',
+		summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary.tab',
+		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples.tab',
+		output_file = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot.png',
+		controls_created = project_name + '_' + ngs_run + '_Controls.tab',
+		sorted_sams = ' '.join(sorted(expand(rules.bwamem.output.sam,sample=sample_list))),
+		bams = ' '.join(sorted(expand(rules.samtools_view.output.bam,sample=sample_list))),
+		sorted_bams = ' '.join(sorted(expand(rules.samtools_sort.output.sorted_bam,sample=sample_list))),
+		pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=sample_list))),
+		summaries = ' '.join(sorted(expand(rules.calculate_mutation_rate.output.mutation_summary,sample=sample_list))),
+	shell:
+		'rm {params.index_file_created} {params.summary_file} {params.low_coverage} {params.output_file} {params.controls_created} {params.sorted_sams} {params.sorted_bams} {params.bams} {params.pileups} {params.summaries}'
+
