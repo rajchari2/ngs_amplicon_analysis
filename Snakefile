@@ -163,7 +163,7 @@ rule clean_run:
 		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples.tab',
 		output_file = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot.png',
 		controls_created = project_name + '_' + ngs_run + '_Controls.tab',
-		sorted_sams = ' '.join(sorted(expand(rules.bwamem.output.sam,sample=sample_list))),
+		sorted_sams = ' '.join(sorted(expand(rules.bwa_mem.output.sam,sample=sample_list))),
 		bams = ' '.join(sorted(expand(rules.samtools_view.output.bam,sample=sample_list))),
 		sorted_bams = ' '.join(sorted(expand(rules.samtools_sort.output.sorted_bam,sample=sample_list))),
 		pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=sample_list))),
