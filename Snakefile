@@ -163,11 +163,16 @@ rule clean_run:
 		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples.tab',
 		output_file = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot.png',
 		controls_created = project_name + '_' + ngs_run + '_Controls.tab',
-		sorted_sams = ' '.join(sorted(expand(rules.bwa_mem.output.sam,sample=sample_list))),
+		sams = ' '.join(sorted(expand(rules.bwa_mem.output.sam,sample=sample_list))),
 		bams = ' '.join(sorted(expand(rules.samtools_view.output.bam,sample=sample_list))),
 		sorted_bams = ' '.join(sorted(expand(rules.samtools_sort.output.sorted_bam,sample=sample_list))),
 		pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=sample_list))),
 		summaries = ' '.join(sorted(expand(rules.calculate_mutation_rate.output.mutation_summary,sample=sample_list))),
+		ctrl_sams = ' '.join(sorted(expand(rules.bwa_mem.output.sam,sample=control_list))),
+		ctrl_bams = ' '.join(sorted(expand(rules.samtools_view.output.bam,sample=control_list))),
+		ctrl_sorted_bams = ' '.join(sorted(expand(rules.samtools_sort.output.sorted_bam,sample=control_list))),
+		ctrl_pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=control_list)))
+
 	shell:
-		'rm {params.index_file_created} {params.summary_file} {params.low_coverage} {params.output_file} {params.controls_created} {params.sorted_sams} {params.sorted_bams} {params.bams} {params.pileups} {params.summaries}'
+		'rm {params.index_file_created} {params.summary_file} {params.low_coverage} {params.output_file} {params.controls_created} {params.sams} {params.sorted_bams} {params.bams} {params.pileups} {params.summaries} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.ctrl_pileups}'
 
