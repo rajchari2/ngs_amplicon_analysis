@@ -125,9 +125,10 @@ rule aggregate_output:
 	params:
 		modality_param = modality
 	output:
-		summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary.tab'
+		summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary.tab',
+		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples.tab'
 	shell:
-		'python resources/aggregate_rates.py -i {input.file_list} -o {output.summary_file} -m {params.modality_param}'
+		'python resources/aggregate_rates.py -i {input.file_list} -o {output.summary_file} -m {params.modality_param} -l {output.low_coverage}'
 
 
 rule graph_output:
