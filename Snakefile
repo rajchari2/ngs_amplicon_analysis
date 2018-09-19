@@ -174,5 +174,5 @@ rule clean_run:
 		ctrl_pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=control_list)))
 
 	shell:
-		'rm {params.index_file_created} {params.summary_file} {params.low_coverage} {params.output_file} {params.controls_created} {params.sams} {params.sorted_bams} {params.bams} {params.pileups} {params.summaries} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.ctrl_pileups}'
+		'rm -f {params.index_file_created} {params.summary_file} {params.low_coverage} {params.output_file} {params.controls_created} {params.sams} {params.sorted_bams} {params.bams} {params.pileups} {params.summaries} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.ctrl_pileups}'
 
