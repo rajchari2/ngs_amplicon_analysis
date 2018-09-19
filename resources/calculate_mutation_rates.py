@@ -382,6 +382,10 @@ def calculate_rate(pileup_file,control,illumina_scoring_file,reference_file,targ
 		for readID in mutatedReads[gene]:
 			if len(mutatedReads[gene][readID]) > 0:
 				mutatedCount += 1
+		# see if no data was added
+		if len(avgDepth[gene])==0:
+			avgDepth[gene].append(0)
+
 		if max(avgDepth[gene]) >= 100:
 			rate = (mutatedCount / max(avgDepth[gene])) * 100
 		else:
