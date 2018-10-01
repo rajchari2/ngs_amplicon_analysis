@@ -21,6 +21,20 @@ from collections import Counter
 from operator import itemgetter
 
 def calculate_NHEJ_mutation_rate (sample_sam_file,control_sam_file,reference_file,target_site,output_file):
+	# variables to store information
+	sample_read_total = 0
+	sample_mutation_count = 0
+	control_mutation_dictionary = defaultdict(str)
+
+	# go through control and get all of the reads in the control sample that would be called mutations
+	for line in control_sam_file:
+		if line.startswith('@')==False:
+			# parse the line
+			line = line.rstrip('\r\n')
+			parts = line.split('\t')
+			# only count the read if FLAG=0 and Map Start = 1
+			if parts[1]=='0' and parts[3]=='1':
+				
 
 
 def calculate_base_editing_rate (sample_sam_file,control_sam_file,reference_file,target_site,output_file):
