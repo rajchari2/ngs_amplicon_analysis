@@ -39,6 +39,7 @@ def make_indel_rate_plot(input_file,output_file):
 		head, tail = os.path.split(key)
 		# remove the mpileup_tab
 		tail = tail.replace('_mpileup.tab','')
+		tail = tail.replace('_bwamem_sorted.bam','')
 		x_data_labels.append(tail)
 		y_data.append(mapped_data[key])
 

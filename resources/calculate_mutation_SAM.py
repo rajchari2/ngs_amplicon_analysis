@@ -13,6 +13,7 @@ import os
 import operator
 import subprocess
 import re
+import pysam
 from Bio import SeqIO
 from Bio.Seq import Seq
 
@@ -20,31 +21,125 @@ from collections import defaultdict
 from collections import Counter
 from operator import itemgetter
 
-def calculate_NHEJ_mutation_rate (sample_sam_file,control_sam_file,reference_file,target_site,output_file):
+def process_cigar(cigar_tuple):
+	alterations = []
+	pos = 1
+	for entry in cigar_tuple:
+		# match
+		if int(entry[0])==0:
+			pos = pos + int(entry[1])
+		elif int(entry[0])==1:
+			alt = str(pos) + ':' + str(pos) + ':Ins'
+			alterations.append(alt)
+		elif int(entry[0])==2:
+			end_pos = pos + int(entry[1])
+			alt = str(pos) + ':' + str(end_pos) + ':Del'
+			pos = end_pos
+			alterations.append(alt)
+	return alterations
+
+def find_target_indices(target_site,reference_file):
+	# store reference sequence
+	refDB = defaultdict(str)
+	targetDB = defaultdict(str)
+	gene = ''
+	for record in SeqIO.parse(reference_file,'fasta'):
+		refDB[str(record.id)] = str(record.seq)
+		targetDB[str(record.id)] = target_site
+		gene = str(record.id)
+
+	# identify the target site start and end
+	targetSeq = targetDB[gene].upper()
+	refSeq = refDB[gene].upper()
+
+	# identify where in the sequence it is
+	tSeq = Seq(targetSeq)
+	targetSeqRC = str(tSeq.reverse_complement())
+
+	# find the sequence
+	index = refSeq.find(targetSeq)
+
+	if index==-1:
+		rcIndex = refSeq.find(targetSeqRC)
+		startIndex = rcIndex
+		endIndex = startIndex + len(targetSeqRC)
+	else:
+		startIndex = index	
+		endIndex = startIndex + len(targetSeq)
+
+	return startIndex,endIndex,gene
+
+
+def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,output_file):
+
 	# variables to store information
 	sample_read_total = 0
 	sample_mutation_count = 0
-	control_mutation_dictionary = defaultdict(str)
+	control_cigar_strings = []
 
-	# go through control and get all of the reads in the control sample that would be called mutations
-	for line in control_sam_file:
-		if line.startswith('@')==False:
-			# parse the line
-			line = line.rstrip('\r\n')
-			parts = line.split('\t')
-			# only count the read if FLAG=0 and Map Start = 1
-			if parts[1]=='0' and parts[3]=='1':
-				
+	# control bam file
+	#control_sam_file = 'processed/' + control + '_bwamem_sorted.bam'
+	control_sam_file = control + '_bwamem_sorted.bam'
 
+	# get the start and end indexes of the target in the reference
+	target_start,target_end,gene = find_target_indices(target_site,reference_file)
 
-def calculate_base_editing_rate (sample_sam_file,control_sam_file,reference_file,target_site,output_file):
+	# go through control file to determine "false" mutations
+	ctrl_sam = pysam.AlignmentFile(control_sam_file,'rb')
+	for read in ctrl_sam.fetch():
+		if 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
+			# check if the read has a mutation that involves the target sequence
+			ctrl_alterations = process_cigar(read.cigartuples)
+			# if alteration is non zero
+			valid_alteration = False
+			if len(ctrl_alterations) > 0:
+				for alt in ctrl_alterations:
+					[start,end,alt_type] = alt.split(':')
+					if ((int(start) >= target_start and int(start) <= target_end) or (int(end) >= target_start and int(end) <= target_end)):
+						valid_alteration = True
+			# check if valid alteration
+			if valid_alteration==True and read.cigarstring not in control_cigar_strings:
+				# add to the control
+				control_cigar_strings.append(read.cigarstring)
+
+	# go through sample BAM file
+	samfile = pysam.AlignmentFile(sample_sam_file,"rb")
+	for read in samfile.fetch():
+		if 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
+			sample_read_total += 1
+			sample_alterations = process_cigar(read.cigartuples)
+			# only count if the tuple is not in the control
+			if len(sample_alterations) > 0 and read.cigarstring not in control_cigar_strings:
+				# if alteration is non zero
+				valid_alteration = False
+				for alt in sample_alterations:
+					[start,end,alt_type] = alt.split(':')
+					if ((int(start) >= target_start and int(start) <= target_end) or (int(end) >= target_start and int(end) <= target_end)):
+						valid_alteration = True
+				if valid_alteration==True:
+					print('Cigarstring: ' + read.cigarstring)
+					print(str(target_start) + ',' + str(target_end))
+					print(sample_alterations)
+					sample_mutation_count += 1
+	if sample_read_total >= 100:
+		rate = (sample_mutation_count / sample_read_total) * 100
+	else:
+		rate = 'N/A'
+	output_file.write(sample_sam_file.name + '\t' + gene + '\t' + str(sample_mutation_count) + '\t' + str(sample_read_total) + '\t' + str(rate) + '\n')
+
+	# close file handles
+	samfile.close()
+	ctrl_sam.close()
+	output_file.close()
+
+#def calculate_base_editing_rate (sample_sam_file,control_sam_file,reference_file,target_site,output_file):
 	
 
 
 def main(argv):
 	parser = argparse.ArgumentParser(description=__doc__)
 	parser.add_argument('-s','--sample_sam_file',type=argparse.FileType('r'),required=True)
-	parser.add_argument('-c','--control_sam_file',type=argparse.FileType('r'),required=True)
+	parser.add_argument('-c','--control_sam_file',required=True)
 	parser.add_argument('-r','--reference_file',required=True)
 	parser.add_argument('-t','--target_site',required=True)
 	parser.add_argument('-m','--modality',required=True)
