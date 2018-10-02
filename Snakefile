@@ -95,6 +95,14 @@ rule samtools_sort:
 	shell:
 		'samtools sort -o {output.sorted_bam} {input.bam}'
 
+rule bam_index:
+	input:
+		sorted_bam = rules.samtools_sort.output.sorted_bam
+	output:
+		bai = 'processed/{sample}_bwamem_sorted.bam.bai'
+	shell:
+		'samtools index {input.sorted_bam}'
+
 rule samtools_pileup:
 	input:
 		sorted_bam = rules.samtools_sort.output.sorted_bam,
@@ -130,7 +138,6 @@ rule aggregate_output:
 	shell:
 		'python resources/aggregate_rates.py -i {input.file_list} -o {output.summary_file} -m {params.modality_param} -l {output.low_coverage}'
 
-
 rule graph_output:
 	input:
 		summary_file = rules.aggregate_output.output.summary_file
@@ -141,6 +148,43 @@ rule graph_output:
 	shell:
 		'python resources/make_bar_plot.py --input_file {input.summary_file} --output_file {output.output_file} --modality {params.modality_param}'
 
+rule calculate_mutation_by_SAM:
+	input:
+		sorted_bam = rules.samtools_sort.output.sorted_bam,
+		bam_index = rules.bam_index.output.bai,
+		reference_file = get_reference
+	params:
+		target_site = get_target_site,
+		cell_type_param = cell_type,
+		modality_param = modality,
+		control_file = get_control_sample
+	output:
+		mutation_summary_by_SAM = 'output/{sample}_mutation_summary_by_SAM.tab'
+	shell:
+		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM}'
+
+rule aggregate_output_SAM:
+	input:
+		file_list = sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list))
+	params:
+		modality_param = modality
+	output:
+		summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary_bySAM.tab',
+		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples_bySAM.tab'
+	shell:
+		'python resources/aggregate_rates.py -i {input.file_list} -o {output.summary_file} -m {params.modality_param} -l {output.low_coverage}'
+
+rule graph_output_SAM:
+	input:
+		summary_file = rules.aggregate_output_SAM.output.summary_file
+	params:
+		modality_param = modality
+	output:
+		output_file = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot_bySAM.png'
+	shell:
+		'python resources/make_bar_plot.py --input_file {input.summary_file} --output_file {output.output_file} --modality {params.modality_param}'
+
+
 rule build_controls:
 	input:
 		pileup_list = expand(rules.samtools_pileup.output.pileup,sample=control_list)
@@ -150,11 +194,17 @@ rule build_controls:
 		'touch {output.controls_created}'
 
 # get all the reference files and run bwa index
-rule make_all:
+rule make_all_V1:
 	input:
 		index_file = rules.build_indexes.output.index_file_created,
 		control_file = rules.build_controls.output.controls_created,
 		report_file = rules.graph_output.output.output_file
+
+rule make_all_V2:
+	input:
+		index_file = rules.build_indexes.output.index_file_created,
+		control_file = rules.build_controls.output.controls_created,
+		report_file = rules.graph_output_SAM.output.output_file
 
 rule clean_run:
 	params:
@@ -171,8 +221,12 @@ rule clean_run:
 		ctrl_sams = ' '.join(sorted(expand(rules.bwa_mem.output.sam,sample=control_list))),
 		ctrl_bams = ' '.join(sorted(expand(rules.samtools_view.output.bam,sample=control_list))),
 		ctrl_sorted_bams = ' '.join(sorted(expand(rules.samtools_sort.output.sorted_bam,sample=control_list))),
-		ctrl_pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=control_list)))
-
+		ctrl_pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=control_list))),
+		bais = ' '.join(sorted(expand(rules.bam_index.output.bai,sample=sample_list))),
+		summaries_SAM = ' '.join(sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list))),
+		summary_file_SAM = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary_bySAM.tab',
+		low_coverage_SAM = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples_bySAM.tab',
+		output_file_SAM = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot_bySAM.png'
 	shell:
-		'rm -f {params.index_file_created} {params.summary_file} {params.low_coverage} {params.output_file} {params.controls_created} {params.sams} {params.sorted_bams} {params.bams} {params.pileups} {params.summaries} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.ctrl_pileups}'
+		'rm -f {params.index_file_created} {params.summary_file} {params.low_coverage} {params.output_file} {params.controls_created} {params.sams} {params.sorted_bams} {params.bams} {params.pileups} {params.summaries} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.ctrl_pileups} {params.bais} {params.summaries_SAM} {params.summary_file_SAM} {params.low_coverage_SAM} {params.output_file_SAM}'
 
