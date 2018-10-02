@@ -187,7 +187,8 @@ rule graph_output_SAM:
 
 rule build_controls:
 	input:
-		pileup_list = expand(rules.samtools_pileup.output.pileup,sample=control_list)
+		pileup_list = expand(rules.samtools_pileup.output.pileup,sample=control_list),
+		bais = expand(rules.bam_index.output.bai,sample=control_list)
 	output:
 		controls_created = project_name + '_' + ngs_run + '_Controls.tab'
 	shell:
