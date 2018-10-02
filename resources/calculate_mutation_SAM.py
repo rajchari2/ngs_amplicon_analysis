@@ -78,8 +78,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	control_cigar_strings = []
 
 	# control bam file
-	#control_sam_file = 'processed/' + control + '_bwamem_sorted.bam'
-	control_sam_file = control + '_bwamem_sorted.bam'
+	control_sam_file = 'processed/' + control + '_bwamem_sorted.bam'
 
 	# get the start and end indexes of the target in the reference
 	target_start,target_end,gene = find_target_indices(target_site,reference_file)
