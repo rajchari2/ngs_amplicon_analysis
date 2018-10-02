@@ -77,6 +77,9 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	sample_mutation_count = 0
 	control_cigar_strings = []
 
+	# write headers to the output file
+	output_file.write('File\tGene\tMutatedCount\tTotalCount\tMutation_Percentage\n')
+
 	# control bam file
 	control_sam_file = 'processed/' + control + '_bwamem_sorted.bam'
 
@@ -116,9 +119,9 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 					if ((int(start) >= target_start and int(start) <= target_end) or (int(end) >= target_start and int(end) <= target_end)):
 						valid_alteration = True
 				if valid_alteration==True:
-					print('Cigarstring: ' + read.cigarstring)
-					print(str(target_start) + ',' + str(target_end))
-					print(sample_alterations)
+					#print('Cigarstring: ' + read.cigarstring)
+					#print(str(target_start) + ',' + str(target_end))
+					#print(sample_alterations)
 					sample_mutation_count += 1
 	if sample_read_total >= 100:
 		rate = (sample_mutation_count / sample_read_total) * 100
