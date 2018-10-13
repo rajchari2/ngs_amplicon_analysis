@@ -42,7 +42,7 @@ def aggregate_files(input_file_list,modality,low_coverage_file,output_file):
 					head, tail = os.path.split(parts[0])
 					# remove the mpileup_tab
 					tail = tail.replace('_mpileup.tab','')
-					tail = tail.replace('_bwamem_sorted.bam')
+					tail = tail.replace('_bwamem_sorted.bam','')
 					low_coverage_file.write(tail + '\n')
 
 			lineCount += 1
