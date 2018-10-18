@@ -92,6 +92,9 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	# get the start and end indexes of the target in the reference
 	target_start,target_end,gene = find_target_indices(target_site,reference_file)
 
+	# write header in output file
+	output_file.write('Sample\tAmplicon_Name\tMutated_Read_Count\tTotal_Read_Count\tNHEJ_Mutation_Rate\n')
+
 	# go through control file to determine "false" mutations
 	ctrl_sam = pysam.AlignmentFile(control_sam_file,'rb')
 	for read in ctrl_sam.fetch():
@@ -134,6 +137,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 		rate = (sample_mutation_count / sample_read_total) * 100
 	else:
 		rate = 'N/A'
+
 	output_file.write(sample_sam_file.name + '\t' + gene + '\t' + str(sample_mutation_count) + '\t' + str(sample_read_total) + '\t' + str(rate) + '\n')
 
 	# close file handles
