@@ -23,7 +23,7 @@ def aggregate_files(input_file_list,modality,low_coverage_file,output_file):
 	if modality=='BE4' or modality=='ABE7.10':
 		output_file.write('File\tGene\tTotalCount\tPos1\tPos2\tPos3\tPos4\tPos5\tPos6\tPos7\tPos8\tPos9\tPos10\tPos11\tPos12\tPos13\tPos14\tPos15\tPos16\tPos17\tPos18\tPos19\tPos20\n')
 	else:
-		output_file.write('File\tGene\tMutatedCount\tTotalCount\tMutation_Percentage\n')
+		output_file.write('File\tGene\tTarget_Site\tMutatedCount\tTotalCount\tMutation_Percentage\n')
 	for infile in input_file_list:
 		ifile = open(infile,'r')
 		lineCount = 0
@@ -35,7 +35,7 @@ def aggregate_files(input_file_list,modality,low_coverage_file,output_file):
 				if modality=='BE4' or modality=='ABE7.10':
 					depth = parts[2]
 				else:
-					depth = parts[3]
+					depth = parts[4]
 				if int(depth) >= 100:
 					output_file.write(line + '\n')
 				else:
