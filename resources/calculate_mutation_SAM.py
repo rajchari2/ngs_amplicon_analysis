@@ -79,7 +79,7 @@ def find_target_indices(target_site,reference_file):
 	return startIndex,endIndex,gene
 
 
-def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,output_file):
+def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,output_file,diversity_file):
 
 	# variables to store information
 	sample_read_total = 0
@@ -94,6 +94,11 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 
 	# write header in output file
 	output_file.write('Sample\tAmplicon_Name\tTarget_Site\tMutated_Read_Count\tTotal_Read_Count\tNHEJ_Mutation_Rate\n')
+	diversity_file.write('Sample\tAmplicon_Name\tTarget_Site\tMutated_Read_Count\tNum_Distinct_Deletions\tNum_Distinct_Insertions\tTotal_Distinct_Events\n')
+
+	# add data structures for insertions and deletions
+	distinct_insertions = []
+	distinct_deletions = []
 
 	# go through control file to determine "false" mutations
 	ctrl_sam = pysam.AlignmentFile(control_sam_file,'rb')
@@ -131,6 +136,13 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 					[start,end,alt_type] = alt.split(':')
 					if ((int(start) >= target_start and int(start) <= target_end) or (int(end) >= target_start and int(end) <= target_end)):
 						valid_alteration = True
+						# add the valid alteration to the tally
+						if alt_type=='Ins':
+							if alt not in distinct_insertions:
+								distinct_insertions.append(alt)
+						elif alt_type=='Del':
+							if alt not in distinct_deletions:
+								distinct_deletions.append(alt)
 				if valid_alteration==True:
 					sample_mutation_count += 1
 	if sample_read_total >= 100:
@@ -138,12 +150,20 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	else:
 		rate = 'N/A'
 
-	output_file.write(sample_sam_file.name + '\t' + gene + '\t' + target_site + '\t' + str(sample_mutation_count) + '\t' + str(sample_read_total) + '\t' + str(rate) + '\n')
+	# update sample name
+	sample_name = sample_sam_file.name
+	sample_name = sample_name.replace('processed/','')
+	sample_name = sample_name.replace('_bwamem_sorted.bam','')
+
+	total_distinct = len(distinct_deletions) + len(distinct_insertions)
+	output_file.write(sample_name + '\t' + gene + '\t' + target_site + '\t' + str(sample_mutation_count) + '\t' + str(sample_read_total) + '\t' + str(rate) + '\n')
+	diversity_file.write(sample_name + '\t' + gene + '\t' + target_site + '\t' + str(sample_mutation_count) + '\t' + str(len(distinct_deletions)) + '\t' + str(len(distinct_insertions)) + '\t' + str(total_distinct) + '\n')
 
 	# close file handles
 	samfile.close()
 	ctrl_sam.close()
 	output_file.close()
+	diversity_file.close()
 
 #def calculate_base_editing_rate (sample_sam_file,control_sam_file,reference_file,target_site,output_file):
 	
@@ -157,11 +177,12 @@ def main(argv):
 	parser.add_argument('-t','--target_site',required=True)
 	parser.add_argument('-m','--modality',required=True)
 	parser.add_argument('-o','--output_file',type=argparse.FileType('w'),required=True)
+	parser.add_argument('-d','--diversity_file',type=argparse.FileType('w'),required=True)
 	opts = parser.parse_args(argv)
 	if opts.modality=='ABE7.10' or opts.modality=='BE4':
-		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.output_file)
+		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.output_file,opts.diversity_file)
 	else:
-		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.output_file)
+		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.output_file,opts.diversity_file)
  
 if __name__ == '__main__':
 	main(sys.argv[1:])
