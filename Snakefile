@@ -147,7 +147,7 @@ rule graph_output:
 	params:
 		modality_param = modality
 	output:
-		output_file = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot.png'
+		output_file = 'final_output/' + ngs_run + '_' + project_name + '_mutation_bar_plot.png'
 	shell:
 		'python resources/make_bar_plot.py --input_file {input.summary_file} --output_file {output.output_file} --modality {params.modality_param}'
 
@@ -182,13 +182,15 @@ rule aggregate_output_SAM:
 
 rule graph_output_SAM:
 	input:
-		summary_file = rules.aggregate_output_SAM.output.mutation_summary_file
+		mutation_file = rules.aggregate_output_SAM.output.mutation_summary_file,
+		diversity_file = rules.aggregate_output_SAM.output.diversity_summary_file
 	params:
 		modality_param = modality
 	output:
-		output_file = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot_bySAM.png'
+		output_file = 'final_output/' + ngs_run + '_' + project_name + '_mutatiion_bar_plot_bySAM.png',
+		diversity_graph = 'final_output/' + ngs_run + '_' + project_name + '_diversity_bar_plot_bySAM.png',
 	shell:
-		'python resources/make_bar_plot.py --input_file {input.summary_file} --output_file {output.output_file} --modality {params.modality_param}'
+		'python resources/make_bar_plot.py -i {input.mutation_file} -o {output.output_file} -m {params.modality_param} -d {input.diversity_file} -g {output.diversity_graph}'
 
 
 rule build_controls:
