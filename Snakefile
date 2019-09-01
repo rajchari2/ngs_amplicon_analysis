@@ -123,24 +123,27 @@ rule calculate_mutation_rate:
 		modality_param = modality,
 		control_file = get_control_sample
 	output:
-		mutation_summary = 'output/{sample}_mutation_summary.tab'
+		mutation_summary = 'output/{sample}_mutation_summary.tab',
+		diversity_output = 'output/{sample}_mutation_diversity.tab'
 	shell:
-		'python resources/calculate_mutation_rates.py -p {input.pileup_file} -c {params.control_file} -i {params.illumina_scoring} -r {input.reference_file} -t {params.target_site} -o {output.mutation_summary} -m {params.modality_param}'
+		'python resources/calculate_mutation_rates.py -p {input.pileup_file} -c {params.control_file} -i {params.illumina_scoring} -r {input.reference_file} -t {params.target_site} -o {output.mutation_summary} -m {params.modality_param} -d {output.diversity_output}'
 
 rule aggregate_output:
 	input:
-		file_list = sorted(expand(rules.calculate_mutation_rate.output.mutation_summary,sample=sample_list))
+		file_list_mutation = sorted(expand(rules.calculate_mutation_rate.output.mutation_summary,sample=sample_list)),
+		file_list_diversity = sorted(expand(rules.calculate_mutation_rate.output.diversity_output,sample=sample_list)),
 	params:
 		modality_param = modality
 	output:
-		summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary.tab',
+		mutation_summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary.tab',
+		diversity_summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_diversity_summary.tab',
 		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples.tab'
 	shell:
-		'python resources/aggregate_rates.py -i {input.file_list} -o {output.summary_file} -m {params.modality_param} -l {output.low_coverage}'
+		'python resources/aggregate_rates.py -i {input.file_list_mutation} -d {input.file_list_diversity} -o {output.summary_file} -m {params.modality_param} -l {output.low_coverage} -s {output.diversity_summary_file}'
 
 rule graph_output:
 	input:
-		summary_file = rules.aggregate_output.output.summary_file
+		summary_file = rules.aggregate_output.output.mutation_summary_file
 	params:
 		modality_param = modality
 	output:
@@ -159,24 +162,27 @@ rule calculate_mutation_by_SAM:
 		modality_param = modality,
 		control_file = get_control_sample
 	output:
-		mutation_summary_by_SAM = 'output/{sample}_mutation_summary_by_SAM.tab'
+		mutation_summary_by_SAM = 'output/{sample}_mutation_summary_by_SAM.tab',
+		diversity_output_by_SAM = 'output/{sample}_mutation_diversity_by_SAM.tab'
 	shell:
-		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM}'
+		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM} -d {output.diversity_output_by_SAM}'
 
 rule aggregate_output_SAM:
 	input:
-		file_list = sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list))
+		mutation_file_list = sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list)),
+		diversity_file_list = sorted(expand(rules.calculate_mutation_by_SAM.output.diversity_output_by_SAM,sample=sample_list)),
 	params:
 		modality_param = modality
 	output:
-		summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary_bySAM.tab',
-		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples_bySAM.tab'
+		mutation_summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary_bySAM.tab',
+		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples_bySAM.tab',
+		diversity_summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_diversity_summary_bySAM.tab',
 	shell:
-		'python resources/aggregate_rates.py -i {input.file_list} -o {output.summary_file} -m {params.modality_param} -l {output.low_coverage}'
+		'python resources/aggregate_rates.py -i {input.mutation_file_list} -d {input.diversity_file_list} -o {output.mutation_summary_file} -m {params.modality_param} -l {output.low_coverage} -s {output.diversity_summary_file}'
 
 rule graph_output_SAM:
 	input:
-		summary_file = rules.aggregate_output_SAM.output.summary_file
+		summary_file = rules.aggregate_output_SAM.output.mutation_summary_file
 	params:
 		modality_param = modality
 	output:
