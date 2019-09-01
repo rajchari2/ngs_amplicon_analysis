@@ -187,7 +187,7 @@ rule graph_output_SAM:
 	params:
 		modality_param = modality
 	output:
-		output_file = 'final_output/' + ngs_run + '_' + project_name + '_mutatiion_bar_plot_bySAM.png',
+		output_file = 'final_output/' + ngs_run + '_' + project_name + '_mutation_bar_plot_bySAM.png',
 		diversity_graph = 'final_output/' + ngs_run + '_' + project_name + '_diversity_bar_plot_bySAM.png',
 	shell:
 		'python resources/make_bar_plot.py -i {input.mutation_file} -o {output.output_file} -m {params.modality_param} -d {input.diversity_file} -g {output.diversity_graph}'
