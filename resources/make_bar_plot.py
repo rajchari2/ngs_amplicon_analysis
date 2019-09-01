@@ -36,11 +36,7 @@ def make_indel_rate_plot(input_file,output_file):
 
 	# put the data into arrays
 	for key in sorted(mapped_data.keys()):
-		head, tail = os.path.split(key)
-		# remove the mpileup_tab
-		tail = tail.replace('_mpileup.tab','')
-		tail = tail.replace('_bwamem_sorted.bam','')
-		x_data_labels.append(tail)
+		x_data_labels.append(key)
 		y_data.append(mapped_data[key])
 
 	# number of bars
