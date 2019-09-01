@@ -100,11 +100,7 @@ def make_diversity_plot(diversity_summary_file,diversity_graph_output):
 	r1 = np.arange(len(x_labels)) * 4
 	r2 = r1 + bar_width
 	r3 = r2 + bar_width
-
-	print(r1)
-	print(r2)
-	print(r3)
-
+	
 	# add axis labels
 	fig, ax = plt.subplots()
 
