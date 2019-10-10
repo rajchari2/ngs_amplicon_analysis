@@ -21,7 +21,7 @@ from collections import defaultdict
 from collections import Counter
 from operator import itemgetter
 
-def process_cigar(cigar_tuple,md_tag,aligned_pairs):
+def process_cigar(cigar_tuple,md_tag,aligned_pairs,query_qualities):
 	alterations = []
 	pos = 1
 	# if the cigar tuple is only 1 entry check if it has a SNP
@@ -29,7 +29,7 @@ def process_cigar(cigar_tuple,md_tag,aligned_pairs):
 		for seq_pos in aligned_pairs:
 			pos = int(seq_pos[0]) + 1
 			base = seq_pos[2]
-			if base.islower():
+			if base.islower() and int(query_qualities[pos-1]) >= 20:
 				alt = str(pos) + ':' + str(pos) + ':SNP'
 				alterations.append(alt)
 	else:
@@ -106,7 +106,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 		if 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
 			# check if the read has a mutation that involves the target sequence
 			md_tag = read.get_tag('MD')
-			ctrl_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True))
+			ctrl_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities)
 			unique_entry = md_tag + '_' + read.cigarstring
 			# if alteration is non zero
 			valid_alteration = False
@@ -126,7 +126,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 		if 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
 			sample_read_total += 1
 			md_tag = read.get_tag('MD')
-			sample_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True))
+			sample_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities)
 			unique_entry = md_tag + '_' + read.cigarstring
 			# only count if the tuple is not in the control
 			if len(sample_alterations) > 0 and unique_entry not in control_cigar_strings:
