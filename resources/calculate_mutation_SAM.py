@@ -103,7 +103,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	# go through control file to determine "false" mutations
 	ctrl_sam = pysam.AlignmentFile(control_sam_file,'rb')
 	for read in ctrl_sam.fetch():
-		if 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
+		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
 			# check if the read has a mutation that involves the target sequence
 			md_tag = read.get_tag('MD')
 			ctrl_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities)
@@ -123,7 +123,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	# go through sample BAM file
 	samfile = pysam.AlignmentFile(sample_sam_file,"rb")
 	for read in samfile.fetch():
-		if 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
+		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
 			sample_read_total += 1
 			md_tag = read.get_tag('MD')
 			sample_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities)
