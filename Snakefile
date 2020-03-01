@@ -78,9 +78,17 @@ rule bwa_mem:
 	shell:
 		'bwa mem {input.reference_file} {input.merged_fastq} > {output.sam}'
 
+rule filter_sam:
+	input:
+		sam_file = rules.bwa_mem.output.sam
+	output:
+		filtered_sam_file = 'processed/{sample}_bwamem_filtered.sam'
+	shell:
+		'python resources/filter_sam.py -i {input.sam_file} -o {output.filtered_sam_file}'
+
 rule samtools_view:
 	input:
-		sam = rules.bwa_mem.output.sam,
+		sam = rules.filter_sam.output.filtered_sam_file,
 		reference_file = get_reference
 	output:
 		bam = 'processed/{sample}_bwamem.bam'
@@ -102,54 +110,6 @@ rule bam_index:
 		bai = 'processed/{sample}_bwamem_sorted.bam.bai'
 	shell:
 		'samtools index {input.sorted_bam}'
-
-rule samtools_pileup:
-	input:
-		sorted_bam = rules.samtools_sort.output.sorted_bam,
-		reference_file = get_reference,
-	output:
-		pileup = 'processed/{sample}_mpileup.tab'
-	shell:
-		'samtools mpileup -C50 -f {input.reference_file} -o {output.pileup} {input.sorted_bam}'
-
-rule calculate_mutation_rate:
-	input:
-		pileup_file = rules.samtools_pileup.output.pileup,
-		reference_file = get_reference,
-	params:
-		illumina_scoring = 'resources/Illumina.Scoring.txt',
-		target_site = get_target_site,
-		cell_type_param = cell_type,
-		modality_param = modality,
-		control_file = get_control_sample
-	output:
-		mutation_summary = 'output/{sample}_mutation_summary.tab',
-		diversity_output = 'output/{sample}_mutation_diversity.tab'
-	shell:
-		'python resources/calculate_mutation_rates.py -p {input.pileup_file} -c {params.control_file} -i {params.illumina_scoring} -r {input.reference_file} -t {params.target_site} -o {output.mutation_summary} -m {params.modality_param} -d {output.diversity_output}'
-
-rule aggregate_output:
-	input:
-		file_list_mutation = sorted(expand(rules.calculate_mutation_rate.output.mutation_summary,sample=sample_list)),
-		file_list_diversity = sorted(expand(rules.calculate_mutation_rate.output.diversity_output,sample=sample_list)),
-	params:
-		modality_param = modality
-	output:
-		mutation_summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary.tab',
-		diversity_summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_diversity_summary.tab',
-		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples.tab'
-	shell:
-		'python resources/aggregate_rates.py -i {input.file_list_mutation} -d {input.file_list_diversity} -o {output.summary_file} -m {params.modality_param} -l {output.low_coverage} -s {output.diversity_summary_file}'
-
-rule graph_output:
-	input:
-		summary_file = rules.aggregate_output.output.mutation_summary_file
-	params:
-		modality_param = modality
-	output:
-		output_file = 'final_output/' + ngs_run + '_' + project_name + '_mutation_bar_plot.png'
-	shell:
-		'python resources/make_bar_plot.py --input_file {input.summary_file} --output_file {output.output_file} --modality {params.modality_param}'
 
 rule calculate_mutation_by_SAM:
 	input:
@@ -192,24 +152,16 @@ rule graph_output_SAM:
 	shell:
 		'python resources/make_bar_plot.py -i {input.mutation_file} -o {output.output_file} -m {params.modality_param} -d {input.diversity_file} -g {output.diversity_graph}'
 
-
 rule build_controls:
 	input:
-		pileup_list = expand(rules.samtools_pileup.output.pileup,sample=control_list),
+		pileup_list = expand(rules.samtools_sort.output.sorted_bam,sample=control_list),
 		bais = expand(rules.bam_index.output.bai,sample=control_list)
 	output:
 		controls_created = project_name + '_' + ngs_run + '_Controls.tab'
 	shell:
 		'touch {output.controls_created}'
 
-# get all the reference files and run bwa index
-rule make_all_V1:
-	input:
-		index_file = rules.build_indexes.output.index_file_created,
-		control_file = rules.build_controls.output.controls_created,
-		report_file = rules.graph_output.output.output_file
-
-rule make_all_V2:
+rule make_all:
 	input:
 		index_file = rules.build_indexes.output.index_file_created,
 		control_file = rules.build_controls.output.controls_created,
@@ -218,24 +170,23 @@ rule make_all_V2:
 rule clean_run:
 	params:
 		index_file_created = 'db/' + project_name + '_' + ngs_run + '_Indexes_Created.tab',
-		summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary.tab',
-		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples.tab',
-		output_file = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot.png',
 		controls_created = project_name + '_' + ngs_run + '_Controls.tab',
 		sams = ' '.join(sorted(expand(rules.bwa_mem.output.sam,sample=sample_list))),
+		filtered_sams = ' '.join(sorted(expand(rules.filter_sam.output.filtered_sam_file,sample=sample_list))),
 		bams = ' '.join(sorted(expand(rules.samtools_view.output.bam,sample=sample_list))),
 		sorted_bams = ' '.join(sorted(expand(rules.samtools_sort.output.sorted_bam,sample=sample_list))),
-		pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=sample_list))),
-		summaries = ' '.join(sorted(expand(rules.calculate_mutation_rate.output.mutation_summary,sample=sample_list))),
 		ctrl_sams = ' '.join(sorted(expand(rules.bwa_mem.output.sam,sample=control_list))),
 		ctrl_bams = ' '.join(sorted(expand(rules.samtools_view.output.bam,sample=control_list))),
 		ctrl_sorted_bams = ' '.join(sorted(expand(rules.samtools_sort.output.sorted_bam,sample=control_list))),
-		ctrl_pileups = ' '.join(sorted(expand(rules.samtools_pileup.output.pileup,sample=control_list))),
 		bais = ' '.join(sorted(expand(rules.bam_index.output.bai,sample=sample_list))),
-		summaries_SAM = ' '.join(sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list))),
+		summaries = ' '.join(sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list))),
+		diversities = ' '.join(sorted(expand(rules.calculate_mutation_by_SAM.output.diversity_output_by_SAM,sample=sample_list))),
 		summary_file_SAM = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary_bySAM.tab',
 		low_coverage_SAM = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples_bySAM.tab',
-		output_file_SAM = 'final_output/' + ngs_run + '_' + project_name + '_bar_plot_bySAM.png'
+		diversity_SAM = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_diversity_summary_bySAM.tab',
+		output_file_SAM = 'final_output/' + ngs_run + '_' + project_name + '_mutation_bar_plot_bySAM.png',
+		div_plot_SAM = 'final_output/' + ngs_run + '_' + project_name + '_diversity_bar_plot_bySAM.png'
+
 	shell:
-		'rm -f {params.index_file_created} {params.summary_file} {params.low_coverage} {params.output_file} {params.controls_created} {params.sams} {params.sorted_bams} {params.bams} {params.pileups} {params.summaries} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.ctrl_pileups} {params.bais} {params.summaries_SAM} {params.summary_file_SAM} {params.low_coverage_SAM} {params.output_file_SAM}'
+		'rm -f {params.index_file_created} {params.controls_created} {params.sams} {params.filtered_sams} {params.sorted_bams} {params.bams} {params.summaries} {params.diversities} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.bais} {params.summary_file_SAM} {params.low_coverage_SAM} {params.output_file_SAM} {params.diversity_SAM} {params.div_plot_SAM}'
 
