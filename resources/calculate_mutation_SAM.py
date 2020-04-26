@@ -47,15 +47,25 @@ def process_cigar(cigar_tuple,md_tag,aligned_pairs,query_qualities):
 				alterations.append(alt)
 	return alterations
 
-def find_target_indices(target_site,reference_file):
+def find_target_indices(target_site,reference_file,coordinates):
 	# store reference sequence
 	refDB = defaultdict(str)
 	targetDB = defaultdict(str)
 	gene = ''
+	if coordinates != 'full':
+		chrom,pos = coordinates.split(':')
+		start,end = pos.split('-')
 	for record in SeqIO.parse(reference_file,'fasta'):
-		refDB[str(record.id)] = str(record.seq)
-		targetDB[str(record.id)] = target_site
-		gene = str(record.id)
+		if coordinates=='full':
+			refDB[str(record.id)] = str(record.seq)
+			targetDB[str(record.id)] = target_site
+			gene = str(record.id)
+			break
+		elif chrom==str(record.id):
+			refDB[str(record.id)] = str(record.seq)[int(start):int(end)]
+			targetDB[str(record.id)] = target_site
+			gene = str(record.id)
+			break
 
 	# identify the target site start and end
 	targetSeq = targetDB[gene].upper()
@@ -79,7 +89,7 @@ def find_target_indices(target_site,reference_file):
 	return startIndex,endIndex,gene
 
 
-def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,output_file,diversity_file):
+def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,coordinates,output_file,diversity_file):
 
 	# variables to store information
 	sample_read_total = 0
@@ -90,7 +100,16 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	control_sam_file = 'processed/' + control + '_bwamem_sorted.bam'
 
 	# get the start and end indexes of the target in the reference
-	target_start,target_end,gene = find_target_indices(target_site,reference_file)
+	target_start,target_end,gene = find_target_indices(target_site,reference_file,coordinates)
+
+
+	# get reference position
+	if coordinates=='full':
+		ref_pos = 0
+	else:
+		chrom,pos = coordinates.split(':')
+		start,end = pos.split('-')
+		ref_pos = int(start)-1
 
 	# write header in output file
 	output_file.write('Sample\tAmplicon_Name\tTarget_Site\tMutated_Read_Count\tTotal_Read_Count\tNHEJ_Mutation_Rate\n')
@@ -103,7 +122,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	# go through control file to determine "false" mutations
 	ctrl_sam = pysam.AlignmentFile(control_sam_file,'rb')
 	for read in ctrl_sam.fetch():
-		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
+		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==ref_pos:
 			# check if the read has a mutation that involves the target sequence
 			md_tag = read.get_tag('MD')
 			ctrl_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities)
@@ -123,7 +142,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	# go through sample BAM file
 	samfile = pysam.AlignmentFile(sample_sam_file,"rb")
 	for read in samfile.fetch():
-		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==0:
+		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==ref_pos:
 			sample_read_total += 1
 			md_tag = read.get_tag('MD')
 			sample_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities)
@@ -166,8 +185,6 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	diversity_file.close()
 
 #def calculate_base_editing_rate (sample_sam_file,control_sam_file,reference_file,target_site,output_file):
-	
-
 
 def main(argv):
 	parser = argparse.ArgumentParser(description=__doc__)
@@ -178,11 +195,12 @@ def main(argv):
 	parser.add_argument('-m','--modality',required=True)
 	parser.add_argument('-o','--output_file',type=argparse.FileType('w'),required=True)
 	parser.add_argument('-d','--diversity_file',type=argparse.FileType('w'),required=True)
+	parser.add_argument('-i','--coordinates',required=True)
 	opts = parser.parse_args(argv)
 	if opts.modality=='ABE7.10' or opts.modality=='BE4':
-		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.output_file,opts.diversity_file)
+		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.coordinates, opts.output_file,opts.diversity_file)
 	else:
-		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.output_file,opts.diversity_file)
+		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site, opts.coordinates, opts.output_file,opts.diversity_file)
  
 if __name__ == '__main__':
 	main(sys.argv[1:])

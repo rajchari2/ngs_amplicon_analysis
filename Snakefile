@@ -11,26 +11,31 @@ cell_type = config["cell_type"]
 ngs_run = config["ngs_run"]
 modality = config["modality"]
 sample_list = []
-reference_list = []
 control_list = []
+reference_list = []
 sample_to_reference = defaultdict(str)
 sample_to_target_site = defaultdict(str)
 sample_to_control = defaultdict(str)
+sample_to_coordinates = defaultdict(str)
 for sample in samples:
 	for sample_name in sample:
 		sample_list.append(sample_name)
 		ref_file = sample[sample_name]['reference']
 		target_site = sample[sample_name]['target_site']
 		control_sample = sample[sample_name]['control_sample']
+		coordinates = sample[sample_name]['coordinates']
 		if ref_file not in reference_list:
 			reference_list.append(ref_file)
-		sample_to_reference[sample_name] = 'db/' + ref_file
+		sample_to_reference[sample_name] = ref_file
+		sample_to_coordinates[sample_name] = coordinates
 		sample_to_target_site[sample_name] = target_site
 		sample_to_control[sample_name] = control_sample
 		# populate control as well
 		if control_sample not in control_list:
 			control_list.append(control_sample)
-			sample_to_reference[control_sample] = 'db/' + ref_file
+			sample_to_reference[control_sample] = ref_file
+			sample_to_target_site[control_sample] = target_site
+			sample_to_coordinates[control_sample] = coordinates
 
 # functions to get variables
 def get_reference(wildcards):
@@ -42,21 +47,26 @@ def get_target_site(wildcards):
 def get_control_sample(wildcards):
 	return sample_to_control[wildcards.sample]
 
+def get_coordinates(wildcards):
+	return sample_to_coordinates[wildcards.sample]
+
 rule bwa_index:
 	input:
-		reference_file = 'db/{reference}'
+		reference_file = '{reference}'
 	output:
-		bai = 'db/{reference}.bwt'
-	shell:
-		'bwa index {input.reference_file}'
+		bai = '{reference}.bwt'
+	run:
+		if os.path.exists(output.bai)==False:
+			shell('bwa index {input.reference_file}')
 
 rule build_indexes:
 	input:
 		ref_list = expand(rules.bwa_index.output.bai,reference=reference_list)
 	output:
-		index_file_created = 'db/' + project_name + '_' + ngs_run + '_Indexes_Created.tab'
-	shell:
-		'cat db/*.fasta > {output.index_file_created}'
+		index_file_created = 'processed/' + project_name + '_' + ngs_run + '_Indexes_Created.tab'
+	run:
+		with open(output.index_file_created, "w") as out:
+			out.write('References indexed\n')
 
 rule flash_merge:
 	input:
@@ -69,10 +79,18 @@ rule flash_merge:
 	shell:
 		'flash -M 100 -o {params.prefix} {input.r1} {input.r2}'
 
+rule mask_seq_qual:
+	input:
+		flash_merged = rules.flash_merge.output.merged
+	output:
+		merged_filtered = 'data_files/{sample}.extendedFrags.filtered.fastq'
+	shell:
+		'python resources/mask_qual.py -i {input.flash_merged} -o {output.merged_filtered} -q 20'
+
 rule bwa_mem:
 	input:
 		reference_file = get_reference,
-		merged_fastq = rules.flash_merge.output.merged
+		merged_fastq = rules.mask_seq_qual.output.merged_filtered,
 	output:
 		sam = 'processed/{sample}_bwamem.sam'
 	shell:
@@ -80,11 +98,13 @@ rule bwa_mem:
 
 rule filter_sam:
 	input:
-		sam_file = rules.bwa_mem.output.sam
+		sam_file = rules.bwa_mem.output.sam,
+	params:
+		coordinates = get_coordinates
 	output:
 		filtered_sam_file = 'processed/{sample}_bwamem_filtered.sam'
 	shell:
-		'python resources/filter_sam.py -i {input.sam_file} -o {output.filtered_sam_file}'
+		'python resources/filter_sam.py -i {input.sam_file} -c {params.coordinates} -o {output.filtered_sam_file}'
 
 rule samtools_view:
 	input:
@@ -120,12 +140,13 @@ rule calculate_mutation_by_SAM:
 		target_site = get_target_site,
 		cell_type_param = cell_type,
 		modality_param = modality,
-		control_file = get_control_sample
+		control_file = get_control_sample,
+		coordinates = get_coordinates
 	output:
 		mutation_summary_by_SAM = 'output/{sample}_mutation_summary_by_SAM.tab',
 		diversity_output_by_SAM = 'output/{sample}_mutation_diversity_by_SAM.tab'
 	shell:
-		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM} -d {output.diversity_output_by_SAM}'
+		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM} -d {output.diversity_output_by_SAM} -i {params.coordinates}'
 
 rule aggregate_output_SAM:
 	input:
@@ -163,13 +184,11 @@ rule build_controls:
 
 rule make_all:
 	input:
-		index_file = rules.build_indexes.output.index_file_created,
 		control_file = rules.build_controls.output.controls_created,
 		report_file = rules.graph_output_SAM.output.output_file
 
 rule clean_run:
 	params:
-		index_file_created = 'db/' + project_name + '_' + ngs_run + '_Indexes_Created.tab',
 		controls_created = project_name + '_' + ngs_run + '_Controls.tab',
 		sams = ' '.join(sorted(expand(rules.bwa_mem.output.sam,sample=sample_list))),
 		filtered_sams = ' '.join(sorted(expand(rules.filter_sam.output.filtered_sam_file,sample=sample_list))),

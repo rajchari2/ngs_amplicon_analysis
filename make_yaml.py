@@ -1,7 +1,8 @@
 # script to make a yaml file from a tab-delimited sample file
 # updated 09/18/18 to compute control subtracted rates
 
-# input file: [tab-delimited - sample name {tab} reference file {tab} target site {tab} control_sample
+# input file: [tab-delimited - sample name {tab} reference file {tab} coordinates {tab} target site {tab} control_sample
+# if coordinates === full -> entire sequence
 # output file: yaml file which can run in the pipeline
 
 # import appropriate libraries
@@ -32,10 +33,9 @@ def makeYAML (input_file,project_name,ngs_run,cell_type,modality,output_file,dir
 		# variables to store fields
 		sample_name = parts[0]
 		reference_file = parts[1]
-		target_site = parts[2]
-		control_sample = parts[3]
-
-		print(line)
+		coordinates = parts[2]
+		target_site = parts[3]
+		control_sample = parts[4]
 
 		# add to control file list
 		if control_sample not in ctrl_list:
@@ -58,9 +58,9 @@ def makeYAML (input_file,project_name,ngs_run,cell_type,modality,output_file,dir
 		sample_dict[sample_name] = {}
 		sample_dict[sample_name]['name'] = sample_name
 		sample_dict[sample_name]['reference'] = reference_file
+		sample_dict[sample_name]['coordinates'] = coordinates
 		sample_dict[sample_name]['target_site'] = target_site
 		sample_dict[sample_name]['control_sample'] = control_sample
-
 
 		# add to yaml dict
 		yaml_dict['samples'].append(sample_dict)
@@ -91,11 +91,11 @@ def main(argv):
 	parser.add_argument('-p','--project_name',required=True)
 	parser.add_argument('-n','--ngs_run',required=True)
 	parser.add_argument('-c','--cell_type',required=True)
-	parser.add_argument('-d','--directory_name',required=True)
+	parser.add_argument('-d','--data_directory',required=True)
 	parser.add_argument('-m','--modality',required=True)
 	parser.add_argument('-o','--output_file',required=True)
 	opts = parser.parse_args(argv)
-	makeYAML(opts.input_file,opts.project_name,opts.ngs_run,opts.cell_type,opts.modality,opts.output_file,opts.directory_name)
+	makeYAML(opts.input_file,opts.project_name,opts.ngs_run,opts.cell_type,opts.modality,opts.output_file,opts.data_directory)
  
 if __name__ == '__main__':
 	main(sys.argv[1:])
