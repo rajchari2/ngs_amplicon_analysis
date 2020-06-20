@@ -30,7 +30,7 @@ def process_cigar(cigar_tuple,md_tag,aligned_pairs,query_qualities):
 			pos = int(seq_pos[0]) + 1
 			base = seq_pos[2]
 			if base.islower() and int(query_qualities[pos-1]) >= 20:
-				alt = str(pos) + ':' + str(pos) + ':SNP'
+				alt = str(pos) + ':' + str(pos) + ':0:SNP'
 				alterations.append(alt)
 	else:
 		for entry in cigar_tuple:
@@ -38,11 +38,12 @@ def process_cigar(cigar_tuple,md_tag,aligned_pairs,query_qualities):
 			if int(entry[0])==0:
 				pos = pos + int(entry[1])
 			elif int(entry[0])==1:
-				alt = str(pos) + ':' + str(pos) + ':Ins'
+				entry[1] 
+				alt = str(pos) + ':' + str(pos) + ':' + str(entry[1]) + ':Ins'
 				alterations.append(alt)
 			elif int(entry[0])==2:
 				end_pos = pos + int(entry[1])
-				alt = str(pos) + ':' + str(end_pos) + ':Del'
+				alt = str(pos) + ':' + str(end_pos) + ':' + str(entry[1]) + ':Del'
 				pos = end_pos
 				alterations.append(alt)
 	return alterations
@@ -89,11 +90,12 @@ def find_target_indices(target_site,reference_file,coordinates):
 	return startIndex,endIndex,gene
 
 
-def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,coordinates,output_file,diversity_file):
+def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,coordinates,output_file):
 
 	# variables to store information
 	sample_read_total = 0
 	sample_mutation_count = 0
+	sample_oof_count = 0
 	control_cigar_strings = []
 
 	# control bam file
@@ -112,12 +114,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 		ref_pos = int(start)-1
 
 	# write header in output file
-	output_file.write('Sample\tAmplicon_Name\tTarget_Site\tMutated_Read_Count\tTotal_Read_Count\tNHEJ_Mutation_Rate\n')
-	diversity_file.write('Sample\tAmplicon_Name\tTarget_Site\tMutated_Read_Count\tNum_Distinct_Deletions\tNum_Distinct_Insertions\tTotal_Distinct_Events\n')
-
-	# add data structures for insertions and deletions
-	distinct_insertions = []
-	distinct_deletions = []
+	output_file.write('Sample\tAmplicon_Name\tTarget_Site\tMutated_Read_Count\tOOF_Mutated_Read_Count\tTotal_Read_Count\tNHEJ_Mutation_Rate\tOOF_Mutation_rate\n')
 
 	# go through control file to determine "false" mutations
 	ctrl_sam = pysam.AlignmentFile(control_sam_file,'rb')
@@ -131,7 +128,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 			valid_alteration = False
 			if len(ctrl_alterations) > 0:
 				for alt in ctrl_alterations:
-					[start,end,alt_type] = alt.split(':')
+					[start,end,indel_len,alt_type] = alt.split(':')
 					if ((int(start) >= target_start and int(start) <= target_end) or (int(end) >= target_start and int(end) <= target_end)):
 						valid_alteration = True
 			# check if valid alteration
@@ -152,37 +149,33 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 				# if alteration is non zero
 				valid_alteration = False
 				for alt in sample_alterations:
-					[start,end,alt_type] = alt.split(':')
+					[start,end,indel_len,alt_type] = alt.split(':')
 					if ((int(start) >= target_start and int(start) <= target_end) or (int(end) >= target_start and int(end) <= target_end)):
 						valid_alteration = True
-						# add the valid alteration to the tally
-						if alt_type=='Ins':
-							if alt not in distinct_insertions:
-								distinct_insertions.append(alt)
-						elif alt_type=='Del':
-							if alt not in distinct_deletions:
-								distinct_deletions.append(alt)
 				if valid_alteration==True:
 					sample_mutation_count += 1
+					# see if it's OOF
+					if int(indel_len) % 3 != 0:
+						sample_oof_count += 1
 	if sample_read_total >= 100:
-		rate = (sample_mutation_count / sample_read_total) * 100
+		nhej_rate = (sample_mutation_count / sample_read_total) * 100
+		oof_rate = (sample_oof_count / sample_read_total) * 100
 	else:
-		rate = 'N/A'
+		nhej_rate = 'N/A'
+		oof_rate = 'N/A'
 
 	# update sample name
 	sample_name = sample_sam_file.name
 	sample_name = sample_name.replace('processed/','')
 	sample_name = sample_name.replace('_bwamem_sorted.bam','')
 
-	total_distinct = len(distinct_deletions) + len(distinct_insertions)
-	output_file.write(sample_name + '\t' + gene + '\t' + target_site + '\t' + str(sample_mutation_count) + '\t' + str(sample_read_total) + '\t' + str(rate) + '\n')
-	diversity_file.write(sample_name + '\t' + gene + '\t' + target_site + '\t' + str(sample_mutation_count) + '\t' + str(len(distinct_deletions)) + '\t' + str(len(distinct_insertions)) + '\t' + str(total_distinct) + '\n')
+	# write to output file
+	output_file.write(sample_name + '\t' + gene + '\t' + target_site + '\t' + str(sample_mutation_count) + '\t' + str(sample_oof_count) + '\t' + str(sample_read_total) + '\t' + str(nhej_rate) + '\t' + str(oof_rate) + '\n')
 
 	# close file handles
 	samfile.close()
 	ctrl_sam.close()
 	output_file.close()
-	diversity_file.close()
 
 #def calculate_base_editing_rate (sample_sam_file,control_sam_file,reference_file,target_site,output_file):
 
@@ -194,13 +187,12 @@ def main(argv):
 	parser.add_argument('-t','--target_site',required=True)
 	parser.add_argument('-m','--modality',required=True)
 	parser.add_argument('-o','--output_file',type=argparse.FileType('w'),required=True)
-	parser.add_argument('-d','--diversity_file',type=argparse.FileType('w'),required=True)
 	parser.add_argument('-i','--coordinates',required=True)
 	opts = parser.parse_args(argv)
 	if opts.modality=='ABE7.10' or opts.modality=='BE4':
-		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.coordinates, opts.output_file,opts.diversity_file)
+		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.coordinates, opts.output_file)
 	else:
-		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site, opts.coordinates, opts.output_file,opts.diversity_file)
+		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site, opts.coordinates, opts.output_file)
  
 if __name__ == '__main__':
 	main(sys.argv[1:])

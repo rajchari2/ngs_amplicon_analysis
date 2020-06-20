@@ -144,34 +144,29 @@ rule calculate_mutation_by_SAM:
 		coordinates = get_coordinates
 	output:
 		mutation_summary_by_SAM = 'output/{sample}_mutation_summary_by_SAM.tab',
-		diversity_output_by_SAM = 'output/{sample}_mutation_diversity_by_SAM.tab'
 	shell:
-		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM} -d {output.diversity_output_by_SAM} -i {params.coordinates}'
+		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM} -i {params.coordinates}'
 
 rule aggregate_output_SAM:
 	input:
-		mutation_file_list = sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list)),
-		diversity_file_list = sorted(expand(rules.calculate_mutation_by_SAM.output.diversity_output_by_SAM,sample=sample_list)),
+		mutation_file_list = sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list))
 	params:
 		modality_param = modality
 	output:
 		mutation_summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary_bySAM.tab',
 		low_coverage = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples_bySAM.tab',
-		diversity_summary_file = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_diversity_summary_bySAM.tab',
 	shell:
-		'python resources/aggregate_rates.py -i {input.mutation_file_list} -d {input.diversity_file_list} -o {output.mutation_summary_file} -m {params.modality_param} -l {output.low_coverage} -s {output.diversity_summary_file}'
+		'python resources/aggregate_rates.py -i {input.mutation_file_list} -o {output.mutation_summary_file} -m {params.modality_param} -l {output.low_coverage}'
 
 rule graph_output_SAM:
 	input:
 		mutation_file = rules.aggregate_output_SAM.output.mutation_summary_file,
-		diversity_file = rules.aggregate_output_SAM.output.diversity_summary_file
 	params:
 		modality_param = modality
 	output:
-		output_file = 'final_output/' + ngs_run + '_' + project_name + '_mutation_bar_plot_bySAM.png',
-		diversity_graph = 'final_output/' + ngs_run + '_' + project_name + '_diversity_bar_plot_bySAM.png',
+		output_file = 'final_output/' + ngs_run + '_' + project_name + '_mutation_bar_plot_bySAM.png'
 	shell:
-		'python resources/make_bar_plot.py -i {input.mutation_file} -o {output.output_file} -m {params.modality_param} -d {input.diversity_file} -g {output.diversity_graph}'
+		'python resources/make_bar_plot.py -i {input.mutation_file} -o {output.output_file} -m {params.modality_param}'
 
 rule build_controls:
 	input:
@@ -199,13 +194,10 @@ rule clean_run:
 		ctrl_sorted_bams = ' '.join(sorted(expand(rules.samtools_sort.output.sorted_bam,sample=control_list))),
 		bais = ' '.join(sorted(expand(rules.bam_index.output.bai,sample=sample_list))),
 		summaries = ' '.join(sorted(expand(rules.calculate_mutation_by_SAM.output.mutation_summary_by_SAM,sample=sample_list))),
-		diversities = ' '.join(sorted(expand(rules.calculate_mutation_by_SAM.output.diversity_output_by_SAM,sample=sample_list))),
 		summary_file_SAM = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_mutation_summary_bySAM.tab',
 		low_coverage_SAM = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_low_coverage_samples_bySAM.tab',
-		diversity_SAM = 'final_output/' + ngs_run + '_' + project_name + '_' + cell_type + '_diversity_summary_bySAM.tab',
 		output_file_SAM = 'final_output/' + ngs_run + '_' + project_name + '_mutation_bar_plot_bySAM.png',
-		div_plot_SAM = 'final_output/' + ngs_run + '_' + project_name + '_diversity_bar_plot_bySAM.png'
 
 	shell:
-		'rm -f {params.index_file_created} {params.controls_created} {params.sams} {params.filtered_sams} {params.sorted_bams} {params.bams} {params.summaries} {params.diversities} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.bais} {params.summary_file_SAM} {params.low_coverage_SAM} {params.output_file_SAM} {params.diversity_SAM} {params.div_plot_SAM}'
+		'rm -f {params.index_file_created} {params.controls_created} {params.sams} {params.filtered_sams} {params.sorted_bams} {params.bams} {params.summaries} {params.ctrl_sams} {params.ctrl_bams} {params.ctrl_sorted_bams} {params.bais} {params.summary_file_SAM} {params.low_coverage_SAM} {params.output_file_SAM}'
 

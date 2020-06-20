@@ -19,12 +19,11 @@ from collections import defaultdict
 from collections import Counter
 from operator import itemgetter
 
-def aggregate_files(input_file_list,diversity_file_list,modality,low_coverage_file,mutation_summary_file,diversity_summary_file):
+def aggregate_files(input_file_list,modality,low_coverage_file,mutation_summary_file):
 	if modality=='BE4' or modality=='ABE7.10':
 		mutation_summary_file.write('File\tGene\tTotalCount\tPos1\tPos2\tPos3\tPos4\tPos5\tPos6\tPos7\tPos8\tPos9\tPos10\tPos11\tPos12\tPos13\tPos14\tPos15\tPos16\tPos17\tPos18\tPos19\tPos20\n')
 	else:
-		mutation_summary_file.write('File\tGene\tTarget_Site\tMutatedCount\tTotalCount\tMutation_Percentage\n')
-		diversity_summary_file.write('File\tGene\tTarget_Site\tMutatedCount\tNum_Distinct_Deletions\tNum_Distinct_Insertions\tTotal_Distinct_Events\n')
+		mutation_summary_file.write('File\tGene\tTarget_Site\tNHEJ_Mutation_Count\tOOF_Mutation_Count\tTotalCount\tTotal_NHEJ_Mutation_Percentage\tOOF_Mutation_Percentage\n')
 	# go through mutation file list
 	for infile in input_file_list:
 		ifile = open(infile,'r')
@@ -50,31 +49,18 @@ def aggregate_files(input_file_list,diversity_file_list,modality,low_coverage_fi
 			lineCount += 1
 		ifile.close()
 
-	# now go through diversity
-	for infile in diversity_file_list:
-		ifile = open(infile,'r')
-		lineCount = 0
-		for line in ifile:
-			if lineCount==1:
-				diversity_summary_file.write(line)
-			lineCount += 1
-		ifile.close()
-
 	# close file handles
 	mutation_summary_file.close()
-	diversity_summary_file.close()
 	low_coverage_file.close()
 
 def main(argv):
 	parser = argparse.ArgumentParser(description=__doc__)
 	parser.add_argument('-i','--input_file_list',nargs='+',required=True)
-	parser.add_argument('-d','--diversity_file_list',nargs='+',required=True)
 	parser.add_argument('-o','--mutation_summary_file',type=argparse.FileType('w'),required=True)
-	parser.add_argument('-s','--diversity_summary_file',type=argparse.FileType('w'),required=True)
 	parser.add_argument('-l','--low_coverage_file',type=argparse.FileType('w'),required=True)
 	parser.add_argument('-m','--modality',required=True)
 	opts = parser.parse_args(argv)
-	aggregate_files (opts.input_file_list,opts.diversity_file_list,opts.modality,opts.low_coverage_file,opts.mutation_summary_file,opts.diversity_summary_file)
+	aggregate_files (opts.input_file_list,opts.modality,opts.low_coverage_file,opts.mutation_summary_file)
  
 if __name__ == '__main__':
 	main(sys.argv[1:])
