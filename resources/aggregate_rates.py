@@ -34,9 +34,9 @@ def aggregate_files(input_file_list,modality,low_coverage_file,mutation_summary_
 				line = line.rstrip('\r\n')
 				parts = line.split('\t')
 				if modality=='BE4' or modality=='ABE7.10':
-					depth = parts[2]
+					depth = parts[3]
 				else:
-					depth = parts[4]
+					depth = parts[5]
 				if int(depth) >= 100:
 					mutation_summary_file.write(line + '\n')
 				else:
