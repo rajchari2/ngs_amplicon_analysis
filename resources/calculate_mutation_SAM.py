@@ -129,7 +129,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 			if len(ctrl_alterations) > 0:
 				for alt in ctrl_alterations:
 					[start,end,indel_len,alt_type] = alt.split(':')
-					if ((int(start) >= target_start and int(start) <= target_end) or (int(end) >= target_start and int(end) <= target_end)):
+					if ((int(start) >= target_start-3 and int(start) <= target_end+3) or (int(end) >= target_start-3 and int(end) <= target_end+3)):
 						valid_alteration = True
 			# check if valid alteration
 			if valid_alteration==True and unique_entry not in control_cigar_strings:
@@ -150,7 +150,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 				valid_alteration = False
 				for alt in sample_alterations:
 					[start,end,indel_len,alt_type] = alt.split(':')
-					if ((int(start) >= target_start and int(start) <= target_end) or (int(end) >= target_start and int(end) <= target_end)):
+					if ((int(start) >= target_start-3 and int(start) <= target_end+3) or (int(end) >= target_start-3 and int(end) <= target_end+3)):
 						valid_alteration = True
 				if valid_alteration==True:
 					sample_mutation_count += 1
