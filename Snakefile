@@ -17,6 +17,7 @@ sample_to_reference = defaultdict(str)
 sample_to_target_site = defaultdict(str)
 sample_to_control = defaultdict(str)
 sample_to_coordinates = defaultdict(str)
+coords_to_amp_name = defaultdict(str)
 for sample in samples:
 	for sample_name in sample:
 		sample_list.append(sample_name)
@@ -24,12 +25,14 @@ for sample in samples:
 		target_site = sample[sample_name]['target_site']
 		control_sample = sample[sample_name]['control_sample']
 		coordinates = sample[sample_name]['coordinates']
+		amp_name = sample[sample_name]['amp_name']
 		if ref_file not in reference_list:
 			reference_list.append(ref_file)
 		sample_to_reference[sample_name] = ref_file
 		sample_to_coordinates[sample_name] = coordinates
 		sample_to_target_site[sample_name] = target_site
 		sample_to_control[sample_name] = control_sample
+		coords_to_amp_name[coordinates] = amp_name
 		# populate control as well
 		if control_sample not in control_list:
 			control_list.append(control_sample)
@@ -100,34 +103,44 @@ rule filter_sam:
 	input:
 		sam_file = rules.bwa_mem.output.sam,
 	params:
-		coordinates = get_coordinates
+		coordinates = get_coordinates,
+		amp_name = coords_to_amp_name[coordinates]
 	output:
-		filtered_sam_file = 'processed/{sample}_bwamem_filtered.sam'
+		filtered_sam_file = 'processed/{sample}_' + coords_to_amp_name[coordinates] + '_bwamem_filtered.sam'
 	shell:
 		'python resources/filter_sam.py -i {input.sam_file} -c {params.coordinates} -o {output.filtered_sam_file}'
 
 rule samtools_view:
 	input:
 		sam = rules.filter_sam.output.filtered_sam_file,
-		reference_file = get_reference
+		reference_file = get_reference,
+	params:
+		coordinates = get_coordinates,
+		amp_name = coords_to_amp_name[coordinates]
 	output:
-		bam = 'processed/{sample}_bwamem.bam'
+		bam = 'processed/{sample}_' + coords_to_amp_name[coordinates] + '_bwamem.bam'
 	shell:
 		'samtools view -bt {input.reference_file} -o {output.bam} {input.sam}'
 
 rule samtools_sort:
 	input:
 		bam = rules.samtools_view.output.bam
+	params:
+		coordinates = get_coordinates,
+		amp_name = coords_to_amp_name[coordinates]
 	output:
-		sorted_bam = 'processed/{sample}_bwamem_sorted.bam'
+		sorted_bam = 'processed/{sample}_' + coords_to_amp_name[coordinates] +'_bwamem_sorted.bam'
 	shell:
 		'samtools sort -o {output.sorted_bam} {input.bam}'
 
 rule bam_index:
 	input:
 		sorted_bam = rules.samtools_sort.output.sorted_bam
+	params:
+		coordinates = get_coordinates,
+		amp_name = coords_to_amp_name[coordinates]
 	output:
-		bai = 'processed/{sample}_bwamem_sorted.bam.bai'
+		bai = 'processed/{sample}_' + coords_to_amp_name[coordinates] + '_bwamem_sorted.bam.bai'
 	shell:
 		'samtools index {input.sorted_bam}'
 
@@ -141,11 +154,12 @@ rule calculate_mutation_by_SAM:
 		cell_type_param = cell_type,
 		modality_param = modality,
 		control_file = get_control_sample,
-		coordinates = get_coordinates
+		coordinates = get_coordinates,
+		amp_name = coords_to_amp_name[coordinates]
 	output:
-		mutation_summary_by_SAM = 'output/{sample}_mutation_summary_by_SAM.tab',
+		mutation_summary_by_SAM = 'output/{sample}_' + coords_to_amp_name[coordinates] + '_mutation_summary_by_SAM.tab',
 	shell:
-		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM} -i {params.coordinates}'
+		'python resources/calculate_mutation_SAM.py -s {input.sorted_bam} -c {params.control_file} -r {input.reference_file} -t {params.target_site} -m {params.modality_param} -o {output.mutation_summary_by_SAM} -i {params.coordinates} -a {params.amp_name}'
 
 rule aggregate_output_SAM:
 	input:

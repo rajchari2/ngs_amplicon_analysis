@@ -90,7 +90,7 @@ def find_target_indices(target_site,reference_file,coordinates):
 	return startIndex,endIndex,gene
 
 
-def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,coordinates,output_file):
+def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,coordinates,amp_name,output_file):
 
 	# variables to store information
 	sample_read_total = 0
@@ -99,7 +99,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	control_cigar_strings = []
 
 	# control bam file
-	control_sam_file = 'processed/' + control + '_bwamem_sorted.bam'
+	control_sam_file = 'processed/' + control + '_' + amp_name + '_bwamem_sorted.bam'
 
 	# get the start and end indexes of the target in the reference
 	target_start,target_end,gene = find_target_indices(target_site,reference_file,coordinates)
@@ -188,11 +188,12 @@ def main(argv):
 	parser.add_argument('-m','--modality',required=True)
 	parser.add_argument('-o','--output_file',type=argparse.FileType('w'),required=True)
 	parser.add_argument('-i','--coordinates',required=True)
+	parser.add_argument('-a','--amp_name',required=True)
 	opts = parser.parse_args(argv)
 	if opts.modality=='ABE7.10' or opts.modality=='BE4':
-		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.coordinates, opts.output_file)
+		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.coordinates, opts.amp_name, opts.output_file)
 	else:
-		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site, opts.coordinates, opts.output_file)
+		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site, opts.coordinates, opts.amp_name, opts.output_file)
  
 if __name__ == '__main__':
 	main(sys.argv[1:])

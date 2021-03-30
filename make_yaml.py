@@ -34,8 +34,9 @@ def makeYAML (input_file,project_name,ngs_run,cell_type,modality,output_file,dir
 		sample_name = parts[0]
 		reference_file = parts[1]
 		coordinates = parts[2]
-		target_site = parts[3]
-		control_sample = parts[4]
+		amplicon_name = parts[3]
+		target_site = parts[4]
+		control_sample = parts[5]
 
 		# add to control file list
 		if control_sample not in ctrl_list:
@@ -59,6 +60,7 @@ def makeYAML (input_file,project_name,ngs_run,cell_type,modality,output_file,dir
 		sample_dict[sample_name]['name'] = sample_name
 		sample_dict[sample_name]['reference'] = reference_file
 		sample_dict[sample_name]['coordinates'] = coordinates
+		sample_dict[sample_name]['amp_name'] = amplicon_name
 		sample_dict[sample_name]['target_site'] = target_site
 		sample_dict[sample_name]['control_sample'] = control_sample
 
