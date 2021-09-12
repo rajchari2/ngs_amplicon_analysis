@@ -21,7 +21,7 @@ from collections import defaultdict
 from collections import Counter
 from operator import itemgetter
 
-def process_cigar(cigar_tuple,md_tag,aligned_pairs,query_qualities):
+def process_cigar(cigar_tuple,md_tag,aligned_pairs,query_qualities,query_alignment_sequence,query_sequence):
 	alterations = []
 	pos = 1
 	# if the cigar tuple is only 1 entry check if it has a SNP
@@ -30,20 +30,36 @@ def process_cigar(cigar_tuple,md_tag,aligned_pairs,query_qualities):
 			pos = int(seq_pos[0]) + 1
 			base = seq_pos[2]
 			if base.islower() and int(query_qualities[pos-1]) >= 20:
-				alt = str(pos) + ':' + str(pos) + ':0:SNP'
+				alt = str(pos) + ':' + str(pos) + ':0:' + str(seq_pos[1]+1) + '-' + str(seq_pos[1]+1) + ':SNP-' + base
 				alterations.append(alt)
 	else:
 		for entry in cigar_tuple:
-			# match
 			if int(entry[0])==0:
 				pos = pos + int(entry[1])
 			elif int(entry[0])==1:
-				entry[1] 
-				alt = str(pos) + ':' + str(pos) + ':' + str(entry[1]) + ':Ins'
+				index = pos-1
+				ins_start = aligned_pairs[index-1][1]
+				if ins_start==None:
+					print(index)
+					print(aligned_pairs)
+				ins_seq = query_alignment_sequence[index-1:index-1+int(entry[1])]
+				alt = str(pos) + ':' + str(pos) + ':' + str(entry[1]) + ':' + str(ins_start+1) + '-' + str(ins_start+1) + ':Ins-' + ins_seq
 				alterations.append(alt)
+				pos = pos + int(entry[1])
 			elif int(entry[0])==2:
+				index = pos - 1
+				current_tuple = aligned_pairs[index]
+				del_start = current_tuple[1]
+				del_end = current_tuple[1]
+				del_seq = ''
+				while index < len(aligned_pairs) and current_tuple[0]==None:
+					del_seq = del_seq + current_tuple[2]
+					del_end = current_tuple[1]
+					index += 1
+					current_tuple = aligned_pairs[index]					
 				end_pos = pos + int(entry[1])
-				alt = str(pos) + ':' + str(end_pos) + ':' + str(entry[1]) + ':Del'
+				# print(end_pos)
+				alt =  str(pos) + ':' + str(end_pos) + ':' + str(entry[1]) + ':' + str(del_start+1) + '-' + str(del_end+1) + ':Del-' + del_seq
 				pos = end_pos
 				alterations.append(alt)
 	return alterations
@@ -90,7 +106,7 @@ def find_target_indices(target_site,reference_file,coordinates):
 	return startIndex,endIndex,gene
 
 
-def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,coordinates,amp_name,output_file):
+def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_site,coordinates,display_name,output_file):
 
 	# variables to store information
 	sample_read_total = 0
@@ -99,7 +115,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	control_cigar_strings = []
 
 	# control bam file
-	control_sam_file = 'processed/' + control + '_' + amp_name + '_bwamem_sorted.bam'
+	control_sam_file = 'processed/' + control + '_bwamem_sorted.bam'
 
 	# get the start and end indexes of the target in the reference
 	target_start,target_end,gene = find_target_indices(target_site,reference_file,coordinates)
@@ -114,7 +130,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 		ref_pos = int(start)-1
 
 	# write header in output file
-	output_file.write('Sample\tAmplicon_Name\tTarget_Site\tMutated_Read_Count\tOOF_Mutated_Read_Count\tTotal_Read_Count\tNHEJ_Mutation_Rate\tOOF_Mutation_rate\n')
+	output_file.write('Sample\tDisplay_Name\tTarget_Site\tMutated_Read_Count\tOOF_Mutated_Read_Count\tTotal_Read_Count\tNHEJ_Mutation_Rate\tOOF_Mutation_rate\tAlterations\n')
 
 	# go through control file to determine "false" mutations
 	ctrl_sam = pysam.AlignmentFile(control_sam_file,'rb')
@@ -122,13 +138,13 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==ref_pos:
 			# check if the read has a mutation that involves the target sequence
 			md_tag = read.get_tag('MD')
-			ctrl_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities)
+			ctrl_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities,read.query_alignment_sequence, read.query_sequence)
 			unique_entry = md_tag + '_' + read.cigarstring
 			# if alteration is non zero
 			valid_alteration = False
 			if len(ctrl_alterations) > 0:
 				for alt in ctrl_alterations:
-					[start,end,indel_len,alt_type] = alt.split(':')
+					[start,end,indel_len,indel_coords,alt_type] = alt.split(':')
 					if ((int(start) >= target_start-3 and int(start) <= target_end+3) or (int(end) >= target_start-3 and int(end) <= target_end+3)):
 						valid_alteration = True
 			# check if valid alteration
@@ -138,26 +154,32 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 
 	# go through sample BAM file
 	samfile = pysam.AlignmentFile(sample_sam_file,"rb")
+	unique_alts = defaultdict(int)
 	for read in samfile.fetch():
 		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==ref_pos:
 			sample_read_total += 1
 			md_tag = read.get_tag('MD')
-			sample_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities)
+			sample_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities,read.query_alignment_sequence, read.query_sequence)
 			unique_entry = md_tag + '_' + read.cigarstring
 			# only count if the tuple is not in the control
 			if len(sample_alterations) > 0 and unique_entry not in control_cigar_strings:
 				# if alteration is non zero
 				valid_alteration = False
 				for alt in sample_alterations:
-					[start,end,indel_len,alt_type] = alt.split(':')
+					[start,end,indel_len,indel_coords,alt_type] = alt.split(':')
 					if ((int(start) >= target_start-3 and int(start) <= target_end+3) or (int(end) >= target_start-3 and int(end) <= target_end+3)):
 						valid_alteration = True
+						final_alt = chrom + ':' + indel_coords + '&' + alt_type
+						if final_alt not in unique_alts:
+							unique_alts[final_alt] = 1
+						else:
+							unique_alts[final_alt] += 1
 				if valid_alteration==True:
 					sample_mutation_count += 1
 					# see if it's OOF
 					if int(indel_len) % 3 != 0:
 						sample_oof_count += 1
-	if sample_read_total >= 100:
+	if sample_read_total > 0:
 		nhej_rate = (sample_mutation_count / sample_read_total) * 100
 		oof_rate = (sample_oof_count / sample_read_total) * 100
 	else:
@@ -170,7 +192,15 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	sample_name = sample_name.replace('_bwamem_sorted.bam','')
 
 	# write to output file
-	output_file.write(sample_name + '\t' + gene + '\t' + target_site + '\t' + str(sample_mutation_count) + '\t' + str(sample_oof_count) + '\t' + str(sample_read_total) + '\t' + str(nhej_rate) + '\t' + str(oof_rate) + '\n')
+	alt_line = []
+	sorted_alts = sorted(unique_alts.items(), key=lambda kv: kv[1], reverse=True)
+	for u_alt in sorted_alts:
+		proportion = round((unique_alts[u_alt[0]] / sample_read_total * 100),2)
+		if proportion >= 20:
+			alt = u_alt[0] + '&' + str(proportion)
+			alt_line.append(alt)
+
+	output_file.write(sample_name + '\t' + display_name + '\t' + target_site + '\t' + str(sample_mutation_count) + '\t' + str(sample_oof_count) + '\t' + str(sample_read_total) + '\t' + str(nhej_rate) + '\t' + str(oof_rate) + '\t' + ';'.join(alt_line) + '\n')
 
 	# close file handles
 	samfile.close()
@@ -188,12 +218,12 @@ def main(argv):
 	parser.add_argument('-m','--modality',required=True)
 	parser.add_argument('-o','--output_file',type=argparse.FileType('w'),required=True)
 	parser.add_argument('-i','--coordinates',required=True)
-	parser.add_argument('-a','--amp_name',required=True)
+	parser.add_argument('-d','--display_name',required=True)
 	opts = parser.parse_args(argv)
 	if opts.modality=='ABE7.10' or opts.modality=='BE4':
-		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.coordinates, opts.amp_name, opts.output_file)
+		calculate_base_editing_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.coordinates,opts.display_name, opts.output_file)
 	else:
-		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site, opts.coordinates, opts.amp_name, opts.output_file)
+		calculate_NHEJ_mutation_rate (opts.sample_sam_file,opts.control_sam_file,opts.reference_file,opts.target_site,opts.coordinates,opts.display_name, opts.output_file)
  
 if __name__ == '__main__':
 	main(sys.argv[1:])

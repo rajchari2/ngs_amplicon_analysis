@@ -29,8 +29,11 @@ def mask_quality(input_fastq,output_fastq,quality):
 		# reset sequence
 		record.seq = Seq(''.join(new_sequence))
 
-		# write to output file
-		SeqIO.write(record, output_fastq, "fastq")
+		# threshold of Ns
+		threshold = len(new_sequence) * 0.1
+		if new_sequence.count('N') < int(threshold):
+			# write to output file
+			SeqIO.write(record, output_fastq, "fastq")
 
 
 def main(argv):

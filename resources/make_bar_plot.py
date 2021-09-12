@@ -32,8 +32,9 @@ def make_indel_rate_plot(input_file,output_file):
 		if line_count > 0:
 			line = line.rstrip('\r\n')
 			parts = line.split('\t')
-			mapped_nhej_data[parts[0]] = float(parts[6])
-			mapped_oof_data[parts[0]] = float(parts[7])
+			s_name = parts[1] + ' (N=' + parts[5] + ')'
+			mapped_nhej_data[s_name] = float(parts[6])
+			mapped_oof_data[s_name] = float(parts[7])
 		line_count += 1
 	input_file.close()
 

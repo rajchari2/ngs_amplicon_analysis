@@ -23,7 +23,7 @@ def aggregate_files(input_file_list,modality,low_coverage_file,mutation_summary_
 	if modality=='BE4' or modality=='ABE7.10':
 		mutation_summary_file.write('File\tGene\tTotalCount\tPos1\tPos2\tPos3\tPos4\tPos5\tPos6\tPos7\tPos8\tPos9\tPos10\tPos11\tPos12\tPos13\tPos14\tPos15\tPos16\tPos17\tPos18\tPos19\tPos20\n')
 	else:
-		mutation_summary_file.write('File\tGene\tTarget_Site\tNHEJ_Mutation_Count\tOOF_Mutation_Count\tTotalCount\tTotal_NHEJ_Mutation_Percentage\tOOF_Mutation_Percentage\n')
+		mutation_summary_file.write('Sample\tDisplay_Name\tTarget_Site\tNHEJ_Mutation_Count\tOOF_Mutation_Count\tTotalCount\tTotal_NHEJ_Mutation_Percentage\tOOF_Mutation_Percentage\tAlterations\n')
 	# go through mutation file list
 	for infile in input_file_list:
 		ifile = open(infile,'r')
@@ -37,14 +37,14 @@ def aggregate_files(input_file_list,modality,low_coverage_file,mutation_summary_
 					depth = parts[3]
 				else:
 					depth = parts[5]
-				if int(depth) >= 100:
+				if int(depth) > 0:
 					mutation_summary_file.write(line + '\n')
-				else:
-					head, tail = os.path.split(parts[0])
-					# remove the mpileup_tab
-					tail = tail.replace('_mpileup.tab','')
-					tail = tail.replace('_bwamem_sorted.bam','')
-					low_coverage_file.write(tail + '\n')
+					if int(depth) < 100:
+						head, tail = os.path.split(parts[0])
+						# remove the mpileup_tab
+						tail = tail.replace('_mpileup.tab','')
+						tail = tail.replace('_bwamem_sorted.bam','')
+						low_coverage_file.write(tail + '\n')
 
 			lineCount += 1
 		ifile.close()
