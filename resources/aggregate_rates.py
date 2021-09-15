@@ -37,14 +37,19 @@ def aggregate_files(input_file_list,modality,low_coverage_file,mutation_summary_
 					depth = parts[3]
 				else:
 					depth = parts[5]
+
+				# get file headers
+				head, tail = os.path.split(parts[0])
+				
+				# remove the mpileup_tab
+				tail = tail.replace('_mpileup.tab','')
+				tail = tail.replace('_bwamem_sorted.bam','')
 				if int(depth) > 0:
 					mutation_summary_file.write(line + '\n')
 					if int(depth) < 100:
-						head, tail = os.path.split(parts[0])
-						# remove the mpileup_tab
-						tail = tail.replace('_mpileup.tab','')
-						tail = tail.replace('_bwamem_sorted.bam','')
 						low_coverage_file.write(tail + '\n')
+				else:
+					low_coverage_file.write(tail + '\n')
 
 			lineCount += 1
 		ifile.close()
