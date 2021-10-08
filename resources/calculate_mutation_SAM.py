@@ -120,7 +120,6 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	# get the start and end indexes of the target in the reference
 	target_start,target_end,gene = find_target_indices(target_site,reference_file,coordinates)
 
-
 	# get reference position
 	if coordinates=='full':
 		ref_pos = 0
@@ -134,10 +133,13 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 
 	# go through control file to determine "false" mutations
 	ctrl_sam = pysam.AlignmentFile(control_sam_file,'rb')
+	ctrl_total_count = 0
+	ctrl_mut_freq = defaultdict(int)
 	for read in ctrl_sam.fetch():
 		if read.cigarstring != None and 'S' not in read.cigarstring and 'H' not in read.cigarstring and int(read.reference_start)==ref_pos:
 			# check if the read has a mutation that involves the target sequence
 			md_tag = read.get_tag('MD')
+			ctrl_total_count += 1
 			ctrl_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities,read.query_alignment_sequence, read.query_sequence)
 			unique_entry = md_tag + '_' + read.cigarstring
 			# if alteration is non zero
@@ -148,9 +150,12 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 					if ((int(start) >= target_start-3 and int(start) <= target_end+3) or (int(end) >= target_start-3 and int(end) <= target_end+3)):
 						valid_alteration = True
 			# check if valid alteration
-			if valid_alteration==True and unique_entry not in control_cigar_strings:
-				# add to the control
-				control_cigar_strings.append(unique_entry)
+			if valid_alteration==True:
+				if unique_entry not in ctrl_mut_freq:
+					ctrl_mut_freq[unique_entry] = 1
+					control_cigar_strings.append(unique_entry)
+				else:
+					ctrl_mut_freq[unique_entry] += 1
 
 	# go through sample BAM file
 	samfile = pysam.AlignmentFile(sample_sam_file,"rb")
@@ -161,8 +166,12 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 			md_tag = read.get_tag('MD')
 			sample_alterations = process_cigar(read.cigartuples,md_tag,read.get_aligned_pairs(with_seq=True),read.query_qualities,read.query_alignment_sequence, read.query_sequence)
 			unique_entry = md_tag + '_' + read.cigarstring
-			# only count if the tuple is not in the control
-			if len(sample_alterations) > 0 and unique_entry not in control_cigar_strings:
+			# only count if the tuple is not in the control at a high frequency
+			entry_freq = 0
+			if unique_entry in ctrl_mut_freq and ctrl_total_count > 0:
+				entry_freq = ctrl_mut_freq[unique_entry] / ctrl_total_count
+
+			if len(sample_alterations) > 0 and entry_freq < 0.1:
 				# if alteration is non zero
 				valid_alteration = False
 				for alt in sample_alterations:
