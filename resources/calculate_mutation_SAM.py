@@ -115,7 +115,7 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 	control_cigar_strings = []
 
 	# control bam file
-	control_sam_file = 'processed/' + control + '_bwamem_sorted.bam'
+	control_sam_file = control + '_bwamem_sorted.bam'
 
 	# get the start and end indexes of the target in the reference
 	target_start,target_end,gene = find_target_indices(target_site,reference_file,coordinates)
@@ -170,13 +170,12 @@ def calculate_NHEJ_mutation_rate (sample_sam_file,control,reference_file,target_
 			entry_freq = 0
 			if unique_entry in ctrl_mut_freq and ctrl_total_count > 0:
 				entry_freq = ctrl_mut_freq[unique_entry] / ctrl_total_count
-
 			if len(sample_alterations) > 0 and entry_freq < 0.1:
 				# if alteration is non zero
 				valid_alteration = False
 				for alt in sample_alterations:
 					[start,end,indel_len,indel_coords,alt_type] = alt.split(':')
-					if ((int(start) >= target_start-3 and int(start) <= target_end+3) or (int(end) >= target_start-3 and int(end) <= target_end+3)):
+					if ((int(start) >= target_start-3 and int(start) <= target_end+3) or (int(end) >= target_start-3 and int(end) <= target_end+3)) or (int(start) <= target_start and int(end) >= target_end):
 						valid_alteration = True
 						final_alt = chrom + ':' + indel_coords + '&' + alt_type
 						if final_alt not in unique_alts:
