@@ -42,14 +42,15 @@ def makeYAML (input_file,project_name,ngs_run,cell_type,modality,output_file,dir
 		target_site = parts[5]
 		control_sample = parts[6]
 
-		# get the size of the amplicon
-		chrom,coords = coordinates.split(':')
-		start,end = coords.split('-')
-		size = int(end) - int(start)
-		if size <= 290:
-			trim = '150'
-		else:
-			trim = '250'
+		# get the size of the amplicon only if it's not full
+		if coordinates != 'full':
+			chrom,coords = coordinates.split(':')
+			start,end = coords.split('-')
+			size = int(end) - int(start)
+			if size <= 290:
+				trim = '150'
+			else:
+				trim = '250'
 
 		# add to control file list
 		if control_sample not in ctrl_list:
